@@ -1,0 +1,16 @@
+version: "3"
+
+services:
+  my-app:
+    image: quiz-app
+    build: .
+    environment:
+      NODE_ENV: development
+    ports:
+      - 3000:3000
+    command: npm run dev
+    volumes:
+      # mount current dir into docker container
+      - .:/my-app
+      # ignore local node_modules, use container
+      - /my-app/node_modules

@@ -1,0 +1,93 @@
+name: CI / CD
+
+on:
+  push:
+    branches: ['develop']
+  release:
+    types: [created]
+
+  lint:
+    name: Lint check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        env:
+          cache-name: quizapp-backend
+        with:
+          # npm cache files are stored in `~/.npm` on Linux/macOS
+          path: ~/.yarn
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+      - name: Install dependencies
+        run: yarn
+
+      - name: Lint
+        run: yarn run eslint . --ext .js,.jsx,.ts,.tsx
+
+  sonar-scan:
+    needs: [lint]
+    name: Sonar scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Test
+        run: yarn test:cov
+
+      - uses: sonarsource/sonarqube-scan-action@v1.2.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+  get-image-info:
+    name: Get docker image info
+    runs-on: ubuntu-latest
+
+    outputs:
+      ECR_REPOSITORY: quizapp-backend
+      IMAGE_TAG: ${{ steps.image-info.outputs.IMAGE_TAG }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Get docker image info
+        id: image-info
+        run: |
+          REF=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
+          SHORT_SHA=$(git rev-parse --short=8 ${{ github.sha }})
+          [[ "${{ github.event_name }}" == "push" ]] && IMAGE_TAG=$REF-$SHORT_SHA
+          [[ "${{ github.event_name }}" == "release" ]] && IMAGE_TAG=$REF
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+  build:
+    needs: [sonar-scan, get-image-info]
+
+    name: Build and push docker image to Amazon ECR
+    runs-on: ubuntu-latest
+
+  deploy-development:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    needs: [build, get-image-info]
+
+    name: Deploy development environment
+    runs-on: ubuntu-latest
+
+  deploy-production:
+    if: github.event_name == 'release' && github.event.release.target_commitish == 'main'
+    needs: [build, get-image-info]
+
+    name: Deploy production environment
+    runs-on: ubuntu-latest

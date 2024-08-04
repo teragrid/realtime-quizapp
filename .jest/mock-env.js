@@ -1,0 +1,9 @@
+process.env.BASE_URL_IMAGE = 'https://s3.ap-southeast-1.amazonaws.com';
+process.env.REGION = 'ap-southeast-1';
+process.env.BUCKET_NAME = 'static-dev';
+process.env.ADMIN_API_KEY = 'test';
+process.env.SOCIAL_SERVICE_BASE_URL = 'https://test';
+process.env.CRYPTOJS_AES_KEY = 'secret key';
+process.env.APPLE_JWKS_URI = 'secret key';
+process.env.GOOGLE_CLIENT_ID = 'secret key';
+process.env.GOOGLE_CLIENT_SECRET = 'secret key';
